@@ -48,23 +48,26 @@ log() {
   fi
 }
 
-FIND_ARGS=("$ROOT")
+tmpfile="$(mktemp)"
+trap 'rm -f "$tmpfile"' EXIT
+
 if [[ "$INCLUDE_NODE_MODULES" == false ]]; then
-  FIND_ARGS+=(-path "$ROOT/node_modules" -prune -o -name '._*' -print0)
+  find "$ROOT" -path "$ROOT/node_modules" -prune -o -name '._*' -print > "$tmpfile" 2>/dev/null || true
 else
-  FIND_ARGS+=(-name '._*' -print0)
+  find "$ROOT" -name '._*' -print > "$tmpfile" 2>/dev/null || true
 fi
 
 count=0
-while IFS= read -r -d '' path; do
+while IFS= read -r path; do
+  [[ -z "$path" ]] && continue
+  count=$((count + 1))
   if [[ "$DRY_RUN" == true ]]; then
     log "  [dry-run] $path"
   else
     rm -rf "$path"
     log "  deleted: $path"
   fi
-  count=$((count + 1))
-done < <(find "${FIND_ARGS[@]}")
+done < "$tmpfile"
 
 if [[ "$QUIET" == false ]]; then
   if [[ "$count" -eq 0 ]]; then
