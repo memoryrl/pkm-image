@@ -12,6 +12,57 @@ function toCdnUrl(url) {
   return url;
 }
 
+export async function searchPokemonSuggestions(koreanName, limit = 8) {
+  const trimmed = koreanName.trim();
+  if (!trimmed) return [];
+
+  const query = `
+    query SearchPokemonByKrName($pattern: String!, $limit: Int!) {
+      pokemonspecies(
+        where: {
+          pokemonspeciesnames: {
+            language_id: { _eq: 3 }
+            name: { _ilike: $pattern }
+          }
+        }
+        limit: $limit
+        order_by: { id: asc }
+      ) {
+        id
+        pokemonspeciesnames(where: { language_id: { _eq: 3 } }, limit: 1) {
+          name
+        }
+      }
+    }
+  `;
+
+  const res = await fetch(GRAPHQL_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query,
+      variables: { pattern: `%${trimmed}%`, limit },
+    }),
+  });
+
+  if (!res.ok) return [];
+
+  const json = await res.json();
+  if (json.errors?.length) return [];
+
+  const names = (json.data?.pokemonspecies ?? [])
+    .map((species) => species.pokemonspeciesnames?.[0]?.name)
+    .filter(Boolean);
+
+  const lower = trimmed.toLowerCase();
+  return [...new Set(names)].sort((a, b) => {
+    const aStarts = a.toLowerCase().startsWith(lower);
+    const bStarts = b.toLowerCase().startsWith(lower);
+    if (aStarts !== bStarts) return aStarts ? -1 : 1;
+    return a.localeCompare(b, 'ko');
+  });
+}
+
 export async function fetchPokemonByKoreanName(koreanName) {
   const query = `
     query GetPokemonByKrName($name: String!) {

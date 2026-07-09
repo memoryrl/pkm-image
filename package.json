@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "cleanup": "bash scripts/cleanup-dot-underscore.sh --quiet",
+    "build": "npm run cleanup && vite build",
+    "preview": "vite preview",
+    "cleanup:deploy": "bash scripts/cleanup-and-deploy.sh",
+    "cleanup:dry-run": "bash scripts/cleanup-dot-underscore.sh --dry-run"
   },
   "dependencies": {
     "react": "^19.1.0",

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-export default function PrintArea({ artworkUrl, pokemonName, outlineDataUrl }) {
+export default function PrintArea({ artworkUrl, pokemonName, outlineDataUrl, presetLabel }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -27,7 +27,10 @@ export default function PrintArea({ artworkUrl, pokemonName, outlineDataUrl }) {
           crossOrigin="anonymous"
         />
       </div>
-      <p className="pokemon-name-tag">{pokemonName}</p>
+      <p className="pokemon-name-tag">
+        {pokemonName}
+        {presetLabel ? ` · ${presetLabel}` : ''}
+      </p>
     </div>
   );
 }
