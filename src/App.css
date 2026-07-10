@@ -1453,6 +1453,7 @@ body {
   :root {
     --print-page-h: 281mm;
     --print-ref-reserve: 50mm;
+    --print-outline-offset: -8mm;
   }
 
   html,
@@ -1553,6 +1554,7 @@ body {
     height: auto !important;
     max-height: 100% !important;
     object-fit: contain;
+    transform: translateY(var(--print-outline-offset));
   }
 
   .ref-image-btn {
