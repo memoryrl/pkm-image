@@ -10,6 +10,7 @@ import PrintArea from './components/PrintArea';
 import OutlinePicker from './components/OutlinePicker';
 import PokemonSearchInput from './components/PokemonSearchInput';
 import PokedexModal from './components/PokedexModal';
+import ServerStatus from './components/ServerStatus';
 
 export default function App() {
   const [query, setQuery] = useState('');
@@ -117,6 +118,8 @@ export default function App() {
     <div className="app">
       <div className="app-shell">
         <header className="header no-print">
+          <ServerStatus />
+          <div className="header-main">
           <div className="header-top">
             <div className="header-brand">
               <span className="header-icon" aria-hidden="true">🎨</span>
@@ -150,6 +153,7 @@ export default function App() {
               {status.message}
             </p>
           )}
+          </div>
         </header>
 
         <main className="canvas-section">

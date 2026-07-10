@@ -338,3 +338,85 @@ export function loadImage(url) {
     img.src = url;
   });
 }
+
+const HEALTH_QUERY_V2 = '{ pokemonspecies(limit: 1) { id } }';
+const HEALTH_QUERY_V1 = '{ pokemon_v2_pokemonspecies(limit: 1) { id } }';
+
+async function pingGraphql(url, query) {
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return 'error';
+    const json = await res.json();
+    return json.errors?.length ? 'error' : 'ok';
+  } catch {
+    return 'error';
+  }
+}
+
+async function pingUrl(url, method = 'GET') {
+  try {
+    const res = await fetch(url, { method, signal: AbortSignal.timeout(8000) });
+    return res.ok ? 'ok' : 'error';
+  } catch {
+    return 'error';
+  }
+}
+
+function resolveOverall({ graphql, graphqlFallback, rest, image }) {
+  const searchOk = graphql === 'ok' || graphqlFallback === 'ok';
+  if (searchOk && rest === 'ok' && image === 'ok') return 'ok';
+  if (searchOk && (rest === 'ok' || image === 'ok')) return 'degraded';
+  if (searchOk) return 'degraded';
+  return 'down';
+}
+
+const OVERALL_LABELS = {
+  checking: '확인 중',
+  ok: '정상',
+  degraded: '일부 장애',
+  down: '장애',
+};
+
+async function pingImage(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const timer = setTimeout(() => resolve('error'), 8000);
+    img.onload = () => {
+      clearTimeout(timer);
+      resolve('ok');
+    };
+    img.onerror = () => {
+      clearTimeout(timer);
+      resolve('error');
+    };
+    img.src = url;
+  });
+}
+
+export async function checkApiHealth() {
+  const [graphql, graphqlFallback, rest, image] = await Promise.all([
+    pingGraphql(GRAPHQL_URL, HEALTH_QUERY_V2),
+    pingGraphql(GRAPHQL_FALLBACK_URL, HEALTH_QUERY_V1),
+    pingUrl(`${REST_URL}/pokemon/25`),
+    pingImage(getArtworkUrlByPokemonId(25)),
+  ]);
+
+  const overall = resolveOverall({ graphql, graphqlFallback, rest, image });
+
+  return {
+    graphql,
+    graphqlFallback,
+    rest,
+    image,
+    overall,
+    overallLabel: OVERALL_LABELS[overall],
+    checkedAt: new Date(),
+  };
+}
+
+export { GRAPHQL_URL, GRAPHQL_FALLBACK_URL, REST_URL };

@@ -56,12 +56,16 @@ body {
 
 /* ── Header ── */
 .header {
-  padding: 20px 16px 16px;
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-muted) 100%);
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 10;
+}
+
+.header-main {
+  padding: 16px 16px 12px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-muted) 100%);
 }
 
 .header-top {
@@ -677,6 +681,125 @@ body {
   to { opacity: 1; }
 }
 
+/* ── Server Status ── */
+.server-status {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.server-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.server-status-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.server-status-refresh {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.server-status-refresh:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.server-status-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.server-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.server-status-time {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.server-status.is-checking .server-status-dot {
+  background: var(--muted);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.server-status.is-ok .server-status-dot {
+  background: #22c55e;
+}
+
+.server-status.is-degraded .server-status-dot {
+  background: #f59e0b;
+}
+
+.server-status.is-down .server-status-dot {
+  background: #ef4444;
+}
+
+.server-status-panel {
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.server-status-panel ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.server-status-panel li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.74rem;
+}
+
+.server-status-panel li span:first-child {
+  color: var(--muted);
+}
+
+.server-status-panel li.ok span:last-child {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.server-status-panel li.error span:last-child {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 /* ── Pokedex Modal ── */
 .pokedex-overlay {
   position: fixed;
@@ -1031,7 +1154,7 @@ body {
     margin-top: 8px;
   }
 
-  .header {
+  .header-main {
     padding: 24px 24px 20px;
   }
 
@@ -1178,7 +1301,8 @@ body {
   .placeholder,
   .outline-picker,
   .pokedex-overlay,
-  .image-zoom-overlay {
+  .image-zoom-overlay,
+  .server-status {
     display: none !important;
   }
 
