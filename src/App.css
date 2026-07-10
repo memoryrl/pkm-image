@@ -1495,30 +1495,34 @@ body {
   }
 
   .print-sheet {
-    height: 100%;
+    width: 100%;
+    min-height: 0;
     display: flex;
     flex-direction: column;
   }
 
   .outline-wrap {
-    flex: 1;
+    flex: 1 1 auto;
     width: 100%;
     min-height: 0;
     height: auto;
-    max-height: calc(100vh - 28mm);
+    max-height: none;
     aspect-ratio: unset;
-    padding: 48mm 50mm 0 0;
+    padding-top: 50mm;
+    padding-right: 0;
     position: relative;
+    display: flex;
     align-items: flex-start;
     justify-content: center;
     box-sizing: border-box;
   }
 
   .outline-canvas {
-    max-width: 100%;
-    max-height: calc(100vh - 80mm);
-    width: auto !important;
+    display: block;
+    width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
+    max-height: calc(297mm - 16mm - 34mm - 50mm);
     object-fit: contain;
   }
 
@@ -1546,23 +1550,33 @@ body {
 
   .print-meta {
     flex-shrink: 0;
-    padding: 2mm 0 0;
+    gap: 4mm 6mm;
+    padding: 4mm 0 2mm;
     page-break-inside: avoid;
   }
 
+  .print-meta-main {
+    gap: 4mm;
+  }
+
+  .print-types {
+    gap: 3mm;
+  }
+
   .print-outline-name {
-    font-size: 28pt;
-    -webkit-text-stroke: 2pt #111;
+    font-size: 40pt;
+    -webkit-text-stroke: 2.5pt #111;
   }
 
   .print-species-no {
-    font-size: 11pt;
-    -webkit-text-stroke: 1pt #111;
+    font-size: 18pt;
+    -webkit-text-stroke: 1.5pt #111;
   }
 
   .print-type-badge {
-    border-width: 1.5pt;
-    font-size: 10pt;
+    border-width: 2pt;
+    padding: 2mm 5mm;
+    font-size: 16pt;
     color: #111;
   }
 }
