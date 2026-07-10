@@ -10,6 +10,7 @@ import PrintArea from './components/PrintArea';
 import OutlinePicker from './components/OutlinePicker';
 import PokemonSearchInput from './components/PokemonSearchInput';
 import PokedexModal from './components/PokedexModal';
+import PokeballIcon from './components/PokeballIcon';
 import ServerStatus from './components/ServerStatus';
 
 export default function App() {
@@ -126,7 +127,9 @@ export default function App() {
           <div className="header-main">
           <div className="header-top">
             <div className="header-brand">
-              <span className="header-icon" aria-hidden="true">🎨</span>
+              <span className="header-icon" aria-hidden="true">
+                <PokeballIcon size={30} className="header-icon-img" />
+              </span>
               <div>
                 <h1>포켓몬 색칠도안</h1>
                 <p className="header-sub">한글 이름으로 검색하고 바로 인쇄하세요</p>
