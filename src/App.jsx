@@ -9,6 +9,7 @@ import Placeholder from './components/Placeholder';
 import PrintArea from './components/PrintArea';
 import OutlinePicker from './components/OutlinePicker';
 import PokemonSearchInput from './components/PokemonSearchInput';
+import PokedexModal from './components/PokedexModal';
 
 export default function App() {
   const [query, setQuery] = useState('');
@@ -18,6 +19,7 @@ export default function App() {
   const [selectedOutline, setSelectedOutline] = useState(null);
   const [selectingPresetId, setSelectingPresetId] = useState(null);
   const [sourceImage, setSourceImage] = useState(null);
+  const [showPokedex, setShowPokedex] = useState(false);
 
   const runSearch = async (name) => {
     const trimmed = name.trim();
@@ -113,53 +115,81 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="header no-print">
-        <h1>🎨 포켓몬 색칠도안</h1>
-        <form className="search-row" onSubmit={handleSearch}>
-          <PokemonSearchInput
-            value={query}
-            onChange={setQuery}
-            onSelect={runSearch}
-            disabled={loading}
-          />
-          <button type="submit" disabled={loading}>
-            조회
-          </button>
-        </form>
-        <p className={`status${status.isError ? ' error' : ''}`}>{status.message}</p>
-      </header>
+      <div className="app-shell">
+        <header className="header no-print">
+          <div className="header-top">
+            <div className="header-brand">
+              <span className="header-icon" aria-hidden="true">🎨</span>
+              <div>
+                <h1>포켓몬 색칠도안</h1>
+                <p className="header-sub">한글 이름으로 검색하고 바로 인쇄하세요</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="dex-open-btn"
+              onClick={() => setShowPokedex(true)}
+              disabled={loading}
+            >
+              도감보기
+            </button>
+          </div>
+          <form className="search-row" onSubmit={handleSearch}>
+            <PokemonSearchInput
+              value={query}
+              onChange={setQuery}
+              onSelect={runSearch}
+              disabled={loading}
+            />
+            <button type="submit" className="search-submit" disabled={loading}>
+              조회
+            </button>
+          </form>
+          {status.message && (
+            <p className={`status${status.isError ? ' error' : ''}`} role="status">
+              {status.message}
+            </p>
+          )}
+        </header>
 
-      <main className="canvas-section">
-        {selectedOutline ? (
-          <PrintArea
-            artworkUrl={selectedOutline.artworkUrl}
-            pokemonName={selectedOutline.name}
-            outlineDataUrl={selectedOutline.outlineDataUrl}
-            presetLabel={selectedOutline.presetLabel}
-          />
-        ) : searchResult ? (
-          <OutlinePicker
-            pokemonName={searchResult.name}
-            artworkUrl={searchResult.artworkUrl}
-            variants={searchResult.variants}
-            onSelect={handleSelectVariant}
-            selectingId={selectingPresetId}
-          />
-        ) : (
-          <Placeholder loading={loading} />
+        <main className="canvas-section">
+          {selectedOutline ? (
+            <PrintArea
+              artworkUrl={selectedOutline.artworkUrl}
+              pokemonName={selectedOutline.name}
+              outlineDataUrl={selectedOutline.outlineDataUrl}
+              presetLabel={selectedOutline.presetLabel}
+            />
+          ) : searchResult ? (
+            <OutlinePicker
+              pokemonName={searchResult.name}
+              artworkUrl={searchResult.artworkUrl}
+              variants={searchResult.variants}
+              onSelect={handleSelectVariant}
+              selectingId={selectingPresetId}
+            />
+          ) : (
+            <Placeholder loading={loading} />
+          )}
+        </main>
+
+        {selectedOutline && (
+          <footer className="actions no-print">
+            <button type="button" className="btn-secondary" onClick={handleBackToPicker}>
+              다른 스타일 선택
+            </button>
+            <button type="button" className="btn-primary" onClick={() => window.print()}>
+              🖨️ 프린트하기
+            </button>
+          </footer>
         )}
-      </main>
+      </div>
 
-      {selectedOutline && (
-        <footer className="actions no-print">
-          <button type="button" className="secondary" onClick={handleBackToPicker}>
-            다른 스타일 선택
-          </button>
-          <button type="button" className="visible" onClick={() => window.print()}>
-            🖨️ 프린트하기
-          </button>
-        </footer>
-      )}
+      <PokedexModal
+        isOpen={showPokedex}
+        onClose={() => setShowPokedex(false)}
+        onSelectPokemon={runSearch}
+      />
     </div>
   );
 }

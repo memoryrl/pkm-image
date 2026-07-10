@@ -20,7 +20,7 @@ export default function OutlinePicker({
 
   return (
     <>
-      <div className="outline-picker">
+      <div className="content-card outline-picker">
         <div className="outline-picker-header">
           <div>
             <h2>{pokemonName}</h2>

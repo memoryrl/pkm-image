@@ -104,6 +104,121 @@ export async function fetchPokemonByKoreanName(koreanName) {
   return { id: pokemon.id, name: pokemon.name, speciesId: species.id };
 }
 
+export function getArtworkUrlByPokemonId(pokemonId) {
+  return `https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/other/official-artwork/${pokemonId}.png`;
+}
+
+const DEX_PAGE_SIZE = 10;
+
+const TYPE_COLORS = {
+  normal: '#A8A878',
+  fire: '#F08030',
+  water: '#6890F0',
+  electric: '#F8D030',
+  grass: '#78C850',
+  ice: '#98D8D8',
+  fighting: '#C03028',
+  poison: '#A040A0',
+  ground: '#E0C068',
+  flying: '#A890F0',
+  psychic: '#F85888',
+  bug: '#A8B820',
+  rock: '#B8A038',
+  ghost: '#705898',
+  dragon: '#7038F8',
+  dark: '#705848',
+  steel: '#B8B8D0',
+  fairy: '#EE99AC',
+};
+
+export function getTypeColor(typeName) {
+  return TYPE_COLORS[typeName] ?? '#94a3b8';
+}
+
+export async function fetchPokemonDexPage(page = 1, pageSize = DEX_PAGE_SIZE) {
+  const offset = (page - 1) * pageSize;
+
+  const query = `
+    query FetchPokemonDexPage($limit: Int!, $offset: Int!) {
+      pokemonspecies_aggregate {
+        aggregate {
+          count
+        }
+      }
+      pokemonspecies(
+        limit: $limit
+        offset: $offset
+        order_by: { id: asc }
+      ) {
+        id
+        pokemonspeciesnames(where: { language_id: { _eq: 3 } }, limit: 1) {
+          name
+        }
+        pokemons(order_by: { id: asc }, limit: 1) {
+          id
+          pokemontypes(order_by: { slot: asc }) {
+            type {
+              name
+              typenames(where: { language_id: { _eq: 3 } }, limit: 1) {
+                name
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const res = await fetch(GRAPHQL_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query,
+      variables: { limit: pageSize, offset },
+    }),
+  });
+
+  if (!res.ok) throw new Error('도감 정보를 불러올 수 없습니다.');
+
+  const json = await res.json();
+  if (json.errors?.length) throw new Error('도감 정보를 불러올 수 없습니다.');
+
+  const total = json.data?.pokemonspecies_aggregate?.aggregate?.count ?? 0;
+  const speciesList = json.data?.pokemonspecies ?? [];
+
+  const items = speciesList
+    .map((species) => {
+      const koreanName = species.pokemonspeciesnames?.[0]?.name;
+      const pokemon = species.pokemons?.[0];
+      const pokemonId = pokemon?.id;
+      if (!koreanName || !pokemonId) return null;
+
+      const types = (pokemon.pokemontypes ?? [])
+        .map((entry) => ({
+          name: entry.type?.name,
+          koreanName: entry.type?.typenames?.[0]?.name ?? entry.type?.name,
+        }))
+        .filter((type) => type.name);
+
+      return {
+        speciesId: species.id,
+        pokemonId,
+        koreanName,
+        types,
+        artworkUrl: getArtworkUrlByPokemonId(pokemonId),
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    items,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
 export async function fetchArtworkUrl(pokemonId) {
   const res = await fetch(`${REST_URL}/pokemon/${pokemonId}`);
   if (!res.ok) throw new Error('이미지 정보를 가져올 수 없습니다.');
