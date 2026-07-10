@@ -1,4 +1,5 @@
 const GRAPHQL_URL = 'https://graphql.pokeapi.co/v1beta2';
+const GRAPHQL_FALLBACK_URL = 'https://beta.pokeapi.co/graphql/v1beta';
 const REST_URL = 'https://pokeapi.co/api/v2';
 
 /** GitHub raw CDN(429 빈발) → jsDelivr CDN으로 변환 */
@@ -12,93 +13,159 @@ function toCdnUrl(url) {
   return url;
 }
 
+async function graphqlRequest(url, query, variables = {}) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`GraphQL HTTP ${res.status}`);
+  }
+
+  const json = await res.json();
+  if (json.errors?.length) {
+    throw new Error(json.errors[0]?.message ?? 'GraphQL error');
+  }
+
+  return json;
+}
+
+async function graphqlWithFallback(queryV2, queryV1, variables = {}) {
+  const attempts = [
+    [GRAPHQL_URL, queryV2],
+    [GRAPHQL_FALLBACK_URL, queryV1],
+  ];
+
+  let lastError = null;
+
+  for (const [url, query] of attempts) {
+    try {
+      return await graphqlRequest(url, query, variables);
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError ?? new Error('API 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+}
+
 export async function searchPokemonSuggestions(koreanName, limit = 8) {
   const trimmed = koreanName.trim();
   if (!trimmed) return [];
 
-  const query = `
-    query SearchPokemonByKrName($pattern: String!, $limit: Int!) {
-      pokemonspecies(
-        where: {
-          pokemonspeciesnames: {
-            language_id: { _eq: 3 }
-            name: { _ilike: $pattern }
+  try {
+    const json = await graphqlWithFallback(
+      `
+        query SearchPokemonByKrName($pattern: String!, $limit: Int!) {
+          pokemonspecies(
+            where: {
+              pokemonspeciesnames: {
+                language_id: { _eq: 3 }
+                name: { _ilike: $pattern }
+              }
+            }
+            limit: $limit
+            order_by: { id: asc }
+          ) {
+            pokemonspeciesnames(where: { language_id: { _eq: 3 } }, limit: 1) {
+              name
+            }
           }
         }
-        limit: $limit
-        order_by: { id: asc }
-      ) {
-        id
-        pokemonspeciesnames(where: { language_id: { _eq: 3 } }, limit: 1) {
-          name
+      `,
+      `
+        query SearchPokemonByKrName($pattern: String!, $limit: Int!) {
+          pokemon_v2_pokemonspecies(
+            where: {
+              pokemon_v2_pokemonspeciesnames: {
+                language_id: { _eq: 3 }
+                name: { _ilike: $pattern }
+              }
+            }
+            limit: $limit
+            order_by: { id: asc }
+          ) {
+            pokemon_v2_pokemonspeciesnames(where: { language_id: { _eq: 3 } }, limit: 1) {
+              name
+            }
+          }
         }
-      }
-    }
-  `;
+      `,
+      { pattern: `%${trimmed}%`, limit },
+    );
 
-  const res = await fetch(GRAPHQL_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      query,
-      variables: { pattern: `%${trimmed}%`, limit },
-    }),
-  });
+    const speciesList =
+      json.data?.pokemonspecies ?? json.data?.pokemon_v2_pokemonspecies ?? [];
 
-  if (!res.ok) return [];
+    const names = speciesList
+      .map((species) => {
+        const namesArr =
+          species.pokemonspeciesnames ?? species.pokemon_v2_pokemonspeciesnames;
+        return namesArr?.[0]?.name;
+      })
+      .filter(Boolean);
 
-  const json = await res.json();
-  if (json.errors?.length) return [];
-
-  const names = (json.data?.pokemonspecies ?? [])
-    .map((species) => species.pokemonspeciesnames?.[0]?.name)
-    .filter(Boolean);
-
-  const lower = trimmed.toLowerCase();
-  return [...new Set(names)].sort((a, b) => {
-    const aStarts = a.toLowerCase().startsWith(lower);
-    const bStarts = b.toLowerCase().startsWith(lower);
-    if (aStarts !== bStarts) return aStarts ? -1 : 1;
-    return a.localeCompare(b, 'ko');
-  });
+    const lower = trimmed.toLowerCase();
+    return [...new Set(names)].sort((a, b) => {
+      const aStarts = a.toLowerCase().startsWith(lower);
+      const bStarts = b.toLowerCase().startsWith(lower);
+      if (aStarts !== bStarts) return aStarts ? -1 : 1;
+      return a.localeCompare(b, 'ko');
+    });
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchPokemonByKoreanName(koreanName) {
-  const query = `
-    query GetPokemonByKrName($name: String!) {
-      pokemonspecies(
-        where: {
-          pokemonspeciesnames: {
-            language_id: { _eq: 3 }
-            name: { _eq: $name }
+  const json = await graphqlWithFallback(
+    `
+      query GetPokemonByKrName($name: String!) {
+        pokemonspecies(
+          where: {
+            pokemonspeciesnames: {
+              language_id: { _eq: 3 }
+              name: { _eq: $name }
+            }
+          }
+          limit: 1
+        ) {
+          id
+          pokemons(order_by: { id: asc }, limit: 1) {
+            id
+            name
           }
         }
-        limit: 1
-      ) {
-        id
-        pokemons(order_by: { id: asc }, limit: 1) {
+      }
+    `,
+    `
+      query GetPokemonByKrName($name: String!) {
+        pokemon_v2_pokemonspecies(
+          where: {
+            pokemon_v2_pokemonspeciesnames: {
+              language_id: { _eq: 3 }
+              name: { _eq: $name }
+            }
+          }
+          limit: 1
+        ) {
           id
-          name
+          pokemon_v2_pokemons(order_by: { id: asc }, limit: 1) {
+            id
+            name
+          }
         }
       }
-    }
-  `;
+    `,
+    { name: koreanName },
+  );
 
-  const res = await fetch(GRAPHQL_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables: { name: koreanName } }),
-  });
-
-  if (!res.ok) throw new Error('API 요청에 실패했습니다.');
-
-  const json = await res.json();
-  if (json.errors?.length) throw new Error('포켓몬을 찾을 수 없습니다.');
-
-  const species = json.data?.pokemonspecies?.[0];
+  const species = json.data?.pokemonspecies?.[0] ?? json.data?.pokemon_v2_pokemonspecies?.[0];
   if (!species) throw new Error(`"${koreanName}" 포켓몬을 찾을 수 없습니다.`);
 
-  const pokemon = species.pokemons?.[0];
+  const pokemon = species.pokemons?.[0] ?? species.pokemon_v2_pokemons?.[0];
   if (!pokemon) throw new Error('포켓몬 데이터를 불러올 수 없습니다.');
 
   return { id: pokemon.id, name: pokemon.name, speciesId: species.id };
@@ -135,69 +202,29 @@ export function getTypeColor(typeName) {
   return TYPE_COLORS[typeName] ?? '#94a3b8';
 }
 
-export async function fetchPokemonDexPage(page = 1, pageSize = DEX_PAGE_SIZE) {
-  const offset = (page - 1) * pageSize;
-
-  const query = `
-    query FetchPokemonDexPage($limit: Int!, $offset: Int!) {
-      pokemonspecies_aggregate {
-        aggregate {
-          count
-        }
-      }
-      pokemonspecies(
-        limit: $limit
-        offset: $offset
-        order_by: { id: asc }
-      ) {
-        id
-        pokemonspeciesnames(where: { language_id: { _eq: 3 } }, limit: 1) {
-          name
-        }
-        pokemons(order_by: { id: asc }, limit: 1) {
-          id
-          pokemontypes(order_by: { slot: asc }) {
-            type {
-              name
-              typenames(where: { language_id: { _eq: 3 } }, limit: 1) {
-                name
-              }
-            }
-          }
-        }
-      }
-    }
-  `;
-
-  const res = await fetch(GRAPHQL_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      query,
-      variables: { limit: pageSize, offset },
-    }),
-  });
-
-  if (!res.ok) throw new Error('도감 정보를 불러올 수 없습니다.');
-
-  const json = await res.json();
-  if (json.errors?.length) throw new Error('도감 정보를 불러올 수 없습니다.');
-
-  const total = json.data?.pokemonspecies_aggregate?.aggregate?.count ?? 0;
-  const speciesList = json.data?.pokemonspecies ?? [];
-
-  const items = speciesList
+function parseDexSpeciesList(speciesList) {
+  return speciesList
     .map((species) => {
-      const koreanName = species.pokemonspeciesnames?.[0]?.name;
-      const pokemon = species.pokemons?.[0];
+      const koreanName = (
+        species.pokemonspeciesnames ?? species.pokemon_v2_pokemonspeciesnames
+      )?.[0]?.name;
+
+      const pokemon = species.pokemons?.[0] ?? species.pokemon_v2_pokemons?.[0];
       const pokemonId = pokemon?.id;
       if (!koreanName || !pokemonId) return null;
 
-      const types = (pokemon.pokemontypes ?? [])
-        .map((entry) => ({
-          name: entry.type?.name,
-          koreanName: entry.type?.typenames?.[0]?.name ?? entry.type?.name,
-        }))
+      const typeEntries = pokemon.pokemontypes ?? pokemon.pokemon_v2_pokemontypes ?? [];
+      const types = typeEntries
+        .map((entry) => {
+          const type = entry.type ?? entry.pokemon_v2_type;
+          const koreanTypeName = (
+            type?.typenames ?? type?.pokemon_v2_typenames
+          )?.[0]?.name;
+          return {
+            name: type?.name,
+            koreanName: koreanTypeName ?? type?.name,
+          };
+        })
         .filter((type) => type.name);
 
       return {
@@ -209,9 +236,73 @@ export async function fetchPokemonDexPage(page = 1, pageSize = DEX_PAGE_SIZE) {
       };
     })
     .filter(Boolean);
+}
+
+export async function fetchPokemonDexPage(page = 1, pageSize = DEX_PAGE_SIZE) {
+  const offset = (page - 1) * pageSize;
+
+  const json = await graphqlWithFallback(
+    `
+      query FetchPokemonDexPage($limit: Int!, $offset: Int!) {
+        pokemonspecies_aggregate {
+          aggregate { count }
+        }
+        pokemonspecies(limit: $limit, offset: $offset, order_by: { id: asc }) {
+          id
+          pokemonspeciesnames(where: { language_id: { _eq: 3 } }, limit: 1) {
+            name
+          }
+          pokemons(order_by: { id: asc }, limit: 1) {
+            id
+            pokemontypes(order_by: { slot: asc }) {
+              type {
+                name
+                typenames(where: { language_id: { _eq: 3 } }, limit: 1) {
+                  name
+                }
+              }
+            }
+          }
+        }
+      }
+    `,
+    `
+      query FetchPokemonDexPage($limit: Int!, $offset: Int!) {
+        pokemon_v2_pokemonspecies_aggregate {
+          aggregate { count }
+        }
+        pokemon_v2_pokemonspecies(limit: $limit, offset: $offset, order_by: { id: asc }) {
+          id
+          pokemon_v2_pokemonspeciesnames(where: { language_id: { _eq: 3 } }, limit: 1) {
+            name
+          }
+          pokemon_v2_pokemons(limit: 1, order_by: { id: asc }) {
+            id
+            pokemon_v2_pokemontypes(order_by: { slot: asc }) {
+              pokemon_v2_type {
+                name
+                pokemon_v2_typenames(where: { language_id: { _eq: 3 } }, limit: 1) {
+                  name
+                }
+              }
+            }
+          }
+        }
+      }
+    `,
+    { limit: pageSize, offset },
+  );
+
+  const total =
+    json.data?.pokemonspecies_aggregate?.aggregate?.count ??
+    json.data?.pokemon_v2_pokemonspecies_aggregate?.aggregate?.count ??
+    0;
+
+  const speciesList =
+    json.data?.pokemonspecies ?? json.data?.pokemon_v2_pokemonspecies ?? [];
 
   return {
-    items,
+    items: parseDexSpeciesList(speciesList),
     total,
     page,
     pageSize,
