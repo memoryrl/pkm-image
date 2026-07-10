@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { fetchPokemonDexPage, getTypeColor } from '../utils/pokemonApi';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { fetchPokemonDexPage, getDexPageForSpeciesId, getTypeColor } from '../utils/pokemonApi';
 import ImageZoomModal from './ImageZoomModal';
 
 function TypeBadges({ types }) {
@@ -20,13 +20,23 @@ function TypeBadges({ types }) {
   );
 }
 
-export default function PokedexModal({ isOpen, onClose, onSelectPokemon }) {
+export default function PokedexModal({
+  isOpen,
+  onClose,
+  onSelectPokemon,
+  initialSpeciesId = null,
+}) {
   const [page, setPage] = useState(1);
   const [sliderPage, setSliderPage] = useState(1);
   const [dexData, setDexData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [zoomTarget, setZoomTarget] = useState(null);
+  const initialSpeciesIdRef = useRef(initialSpeciesId);
+
+  useEffect(() => {
+    initialSpeciesIdRef.current = initialSpeciesId;
+  }, [initialSpeciesId]);
 
   const loadPage = useCallback(async (targetPage) => {
     setLoading(true);
@@ -47,7 +57,10 @@ export default function PokedexModal({ isOpen, onClose, onSelectPokemon }) {
 
   useEffect(() => {
     if (!isOpen) return;
-    loadPage(1);
+
+    const speciesId = initialSpeciesIdRef.current;
+    const targetPage = speciesId ? getDexPageForSpeciesId(speciesId) : 1;
+    loadPage(targetPage);
     setZoomTarget(null);
   }, [isOpen, loadPage]);
 
@@ -137,7 +150,7 @@ export default function PokedexModal({ isOpen, onClose, onSelectPokemon }) {
                   dexData?.items.map((item) => (
                     <article
                       key={item.speciesId}
-                      className="pokedex-card"
+                      className={`pokedex-card${item.speciesId === initialSpeciesId ? ' is-current' : ''}`}
                       onClick={() => handleSelect(item)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
@@ -159,11 +172,13 @@ export default function PokedexModal({ isOpen, onClose, onSelectPokemon }) {
                           }}
                         />
                         <div className="pokedex-card-overlay">
-                          <span className="pokedex-card-no">
-                            No. {String(item.speciesId).padStart(4, '0')}
-                          </span>
+                          <div className="pokedex-card-top">
+                            <span className="pokedex-card-no">
+                              No. {String(item.speciesId).padStart(4, '0')}
+                            </span>
+                            <TypeBadges types={item.types} />
+                          </div>
                           <strong>{item.koreanName}</strong>
-                          <TypeBadges types={item.types} />
                         </div>
                         <button
                           type="button"
@@ -238,11 +253,9 @@ export default function PokedexModal({ isOpen, onClose, onSelectPokemon }) {
         isOpen={Boolean(zoomTarget)}
         imageUrl={zoomTarget?.artworkUrl}
         title={zoomTarget ? `${zoomTarget.koreanName} · 원본` : ''}
-        subtitle={
-          zoomTarget
-            ? `No. ${String(zoomTarget.speciesId).padStart(4, '0')} · ${zoomTarget.types?.map((t) => t.koreanName).join(' / ') ?? ''}`
-            : ''
-        }
+        subtitle="컬러 일러스트"
+        speciesId={zoomTarget?.speciesId}
+        types={zoomTarget?.types}
         onClose={() => setZoomTarget(null)}
         onSelect={handleSelectFromZoom}
         selectLabel="이 포켓몬 선택"

@@ -53,6 +53,8 @@ export default function App() {
         name: trimmed,
         artworkUrl,
         variants,
+        types: pokemon.types,
+        speciesId: pokemon.speciesId,
       });
       setStatus({ message: `${trimmed} 색칠도안 스타일을 선택해 주세요.`, isError: false });
     } catch (err) {
@@ -86,6 +88,8 @@ export default function App() {
         artworkUrl: searchResult.artworkUrl,
         outlineDataUrl,
         presetLabel: variant.label,
+        types: searchResult.types,
+        speciesId: searchResult.speciesId,
       });
       setStatus({
         message: `${searchResult.name} · ${variant.label} 색칠도안이 준비되었습니다!`,
@@ -161,13 +165,16 @@ export default function App() {
             <PrintArea
               artworkUrl={selectedOutline.artworkUrl}
               pokemonName={selectedOutline.name}
+              speciesId={selectedOutline.speciesId}
+              types={selectedOutline.types}
               outlineDataUrl={selectedOutline.outlineDataUrl}
-              presetLabel={selectedOutline.presetLabel}
             />
           ) : searchResult ? (
             <OutlinePicker
               pokemonName={searchResult.name}
               artworkUrl={searchResult.artworkUrl}
+              speciesId={searchResult.speciesId}
+              types={searchResult.types}
               variants={searchResult.variants}
               onSelect={handleSelectVariant}
               selectingId={selectingPresetId}
@@ -193,6 +200,7 @@ export default function App() {
         isOpen={showPokedex}
         onClose={() => setShowPokedex(false)}
         onSelectPokemon={runSearch}
+        initialSpeciesId={selectedOutline?.speciesId ?? searchResult?.speciesId ?? null}
       />
     </div>
   );

@@ -1,6 +1,23 @@
 const GRAPHQL_URL = 'https://graphql.pokeapi.co/v1beta2';
 const GRAPHQL_FALLBACK_URL = 'https://beta.pokeapi.co/graphql/v1beta';
+const GRAPHQL_PROXY_URL = '/api/graphql';
 const REST_URL = 'https://pokeapi.co/api/v2';
+const IS_BROWSER = typeof window !== 'undefined';
+
+function getGraphqlAttempts(queryV2, queryV1) {
+  if (import.meta.env.DEV) {
+    return [[GRAPHQL_PROXY_URL, queryV1]];
+  }
+
+  if (IS_BROWSER) {
+    return [[GRAPHQL_FALLBACK_URL, queryV1]];
+  }
+
+  return [
+    [GRAPHQL_URL, queryV2],
+    [GRAPHQL_FALLBACK_URL, queryV1],
+  ];
+}
 
 /** GitHub raw CDN(429 빈발) → jsDelivr CDN으로 변환 */
 function toCdnUrl(url) {
@@ -33,10 +50,7 @@ async function graphqlRequest(url, query, variables = {}) {
 }
 
 async function graphqlWithFallback(queryV2, queryV1, variables = {}) {
-  const attempts = [
-    [GRAPHQL_URL, queryV2],
-    [GRAPHQL_FALLBACK_URL, queryV1],
-  ];
+  const attempts = getGraphqlAttempts(queryV2, queryV1);
 
   let lastError = null;
 
@@ -119,6 +133,24 @@ export async function searchPokemonSuggestions(koreanName, limit = 8) {
   }
 }
 
+function parsePokemonTypes(pokemon) {
+  const typeEntries = pokemon.pokemontypes ?? pokemon.pokemon_v2_pokemontypes ?? [];
+
+  return typeEntries
+    .map((entry) => {
+      const type = entry.type ?? entry.pokemon_v2_type;
+      const koreanTypeName = (
+        type?.typenames ?? type?.pokemon_v2_typenames
+      )?.[0]?.name;
+
+      return {
+        name: type?.name,
+        koreanName: koreanTypeName ?? type?.name,
+      };
+    })
+    .filter((type) => type.name);
+}
+
 export async function fetchPokemonByKoreanName(koreanName) {
   const json = await graphqlWithFallback(
     `
@@ -136,6 +168,14 @@ export async function fetchPokemonByKoreanName(koreanName) {
           pokemons(order_by: { id: asc }, limit: 1) {
             id
             name
+            pokemontypes(order_by: { slot: asc }) {
+              type {
+                name
+                typenames(where: { language_id: { _eq: 3 } }, limit: 1) {
+                  name
+                }
+              }
+            }
           }
         }
       }
@@ -155,6 +195,14 @@ export async function fetchPokemonByKoreanName(koreanName) {
           pokemon_v2_pokemons(order_by: { id: asc }, limit: 1) {
             id
             name
+            pokemon_v2_pokemontypes(order_by: { slot: asc }) {
+              pokemon_v2_type {
+                name
+                pokemon_v2_typenames(where: { language_id: { _eq: 3 } }, limit: 1) {
+                  name
+                }
+              }
+            }
           }
         }
       }
@@ -168,7 +216,12 @@ export async function fetchPokemonByKoreanName(koreanName) {
   const pokemon = species.pokemons?.[0] ?? species.pokemon_v2_pokemons?.[0];
   if (!pokemon) throw new Error('포켓몬 데이터를 불러올 수 없습니다.');
 
-  return { id: pokemon.id, name: pokemon.name, speciesId: species.id };
+  return {
+    id: pokemon.id,
+    name: pokemon.name,
+    speciesId: species.id,
+    types: parsePokemonTypes(pokemon),
+  };
 }
 
 export function getArtworkUrlByPokemonId(pokemonId) {
@@ -176,6 +229,11 @@ export function getArtworkUrlByPokemonId(pokemonId) {
 }
 
 const DEX_PAGE_SIZE = 10;
+
+export function getDexPageForSpeciesId(speciesId, pageSize = DEX_PAGE_SIZE) {
+  if (!speciesId || speciesId < 1) return 1;
+  return Math.max(1, Math.ceil(speciesId / pageSize));
+}
 
 const TYPE_COLORS = {
   normal: '#A8A878',
@@ -213,19 +271,7 @@ function parseDexSpeciesList(speciesList) {
       const pokemonId = pokemon?.id;
       if (!koreanName || !pokemonId) return null;
 
-      const typeEntries = pokemon.pokemontypes ?? pokemon.pokemon_v2_pokemontypes ?? [];
-      const types = typeEntries
-        .map((entry) => {
-          const type = entry.type ?? entry.pokemon_v2_type;
-          const koreanTypeName = (
-            type?.typenames ?? type?.pokemon_v2_typenames
-          )?.[0]?.name;
-          return {
-            name: type?.name,
-            koreanName: koreanTypeName ?? type?.name,
-          };
-        })
-        .filter((type) => type.name);
+      const types = parsePokemonTypes(pokemon);
 
       return {
         speciesId: species.id,
@@ -400,8 +446,11 @@ async function pingImage(url) {
 
 export async function checkApiHealth() {
   const [graphql, graphqlFallback, rest, image] = await Promise.all([
-    pingGraphql(GRAPHQL_URL, HEALTH_QUERY_V2),
-    pingGraphql(GRAPHQL_FALLBACK_URL, HEALTH_QUERY_V1),
+    IS_BROWSER ? Promise.resolve('error') : pingGraphql(GRAPHQL_URL, HEALTH_QUERY_V2),
+    pingGraphql(
+      import.meta.env.DEV ? GRAPHQL_PROXY_URL : GRAPHQL_FALLBACK_URL,
+      HEALTH_QUERY_V1,
+    ),
     pingUrl(`${REST_URL}/pokemon/25`),
     pingImage(getArtworkUrlByPokemonId(25)),
   ]);

@@ -5,6 +5,8 @@ export default function ImageZoomModal({
   imageUrl,
   title,
   subtitle,
+  speciesId,
+  types,
   onClose,
   onSelect,
   selectLabel = '이 도안 선택',
@@ -49,10 +51,28 @@ export default function ImageZoomModal({
           ×
         </button>
 
-        {(title || subtitle) && (
+        {(title || subtitle || speciesId != null || types?.length > 0) && (
           <div className="image-zoom-header">
-            {title && <strong>{title}</strong>}
-            {subtitle && <span>{subtitle}</span>}
+            {(title || speciesId != null) && (
+              <div className="image-zoom-title-row">
+                {speciesId != null && (
+                  <span className="image-zoom-no">
+                    No. {String(speciesId).padStart(4, '0')}
+                  </span>
+                )}
+                {title && <strong>{title}</strong>}
+              </div>
+            )}
+            {types?.length > 0 && (
+              <div className="image-zoom-types" aria-label="타입">
+                {types.map((type) => (
+                  <span key={type.name} className="image-zoom-type">
+                    {type.koreanName}
+                  </span>
+                ))}
+              </div>
+            )}
+            {subtitle && <span className="image-zoom-subtitle">{subtitle}</span>}
           </div>
         )}
 

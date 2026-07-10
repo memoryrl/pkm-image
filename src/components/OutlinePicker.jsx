@@ -4,6 +4,8 @@ import ImageZoomModal from './ImageZoomModal';
 export default function OutlinePicker({
   pokemonName,
   artworkUrl,
+  speciesId,
+  types,
   variants,
   onSelect,
   selectingId,
@@ -87,6 +89,8 @@ export default function OutlinePicker({
         imageUrl={zoomTarget?.previewDataUrl}
         title={zoomTarget ? `${pokemonName} · ${zoomTarget.label}` : ''}
         subtitle={zoomTarget?.description}
+        speciesId={speciesId}
+        types={types}
         onClose={closeZoom}
         onSelect={zoomTarget?.id === 'artwork' ? undefined : handleSelectFromZoom}
         selectLabel="이 도안 선택"
