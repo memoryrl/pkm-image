@@ -2,8 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchPokemonDexPage, getDexPageForSpeciesId, getTypeColor } from '../utils/pokemonApi';
 import ImageZoomModal from './ImageZoomModal';
 
-const SKELETON_COUNT = 10;
-
 function TypeBadges({ types }) {
   if (!types?.length) return null;
 
@@ -19,93 +17,6 @@ function TypeBadges({ types }) {
         </span>
       ))}
     </div>
-  );
-}
-
-function PokedexCardSkeleton() {
-  return (
-    <div className="pokedex-card pokedex-card--skeleton" aria-hidden="true">
-      <div className="pokedex-card-visual">
-        <div className="pokedex-card-skeleton-shimmer">
-          <div className="pokedex-skel-bone pokedex-skel-bone--no" />
-          <div className="pokedex-skel-bone pokedex-skel-bone--name" />
-          <div className="pokedex-skel-bone pokedex-skel-bone--art" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PokedexCard({ item, isCurrent, onSelect, onZoom }) {
-  const [imgLoaded, setImgLoaded] = useState(false);
-  const [imgSrc, setImgSrc] = useState(item.artworkUrl);
-
-  useEffect(() => {
-    setImgLoaded(false);
-    setImgSrc(item.artworkUrl);
-  }, [item.artworkUrl, item.speciesId]);
-
-  return (
-    <article
-      className={`pokedex-card${isCurrent ? ' is-current' : ''}${imgLoaded ? ' is-ready' : ' is-loading-img'}`}
-      onClick={() => onSelect(item)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onSelect(item);
-        }
-      }}
-      role="button"
-      tabIndex={0}
-      aria-label={`${item.koreanName} 색칠도안 만들기`}
-      aria-busy={!imgLoaded}
-    >
-      <div className="pokedex-card-visual">
-        {!imgLoaded && (
-          <div className="pokedex-card-skeleton-shimmer" aria-hidden="true">
-            <div className="pokedex-skel-bone pokedex-skel-bone--no" />
-            <div className="pokedex-skel-bone pokedex-skel-bone--name" />
-            <div className="pokedex-skel-bone pokedex-skel-bone--art" />
-          </div>
-        )}
-        <img
-          src={imgSrc}
-          alt=""
-          loading="lazy"
-          className={imgLoaded ? 'is-loaded' : ''}
-          onLoad={() => setImgLoaded(true)}
-          onError={() => {
-            const fallback = `https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/${item.pokemonId}.png`;
-            if (imgSrc !== fallback) {
-              setImgLoaded(false);
-              setImgSrc(fallback);
-            } else {
-              setImgLoaded(true);
-            }
-          }}
-        />
-        <div className="pokedex-card-overlay">
-          <div className="pokedex-card-top">
-            <span className="pokedex-card-no">
-              No. {String(item.speciesId).padStart(4, '0')}
-            </span>
-            <TypeBadges types={item.types} />
-          </div>
-          <strong>{item.koreanName}</strong>
-        </div>
-        <button
-          type="button"
-          className="pokedex-card-zoom-fab"
-          onClick={(e) => {
-            e.stopPropagation();
-            onZoom(item);
-          }}
-          aria-label={`${item.koreanName} 원본 이미지 크게 보기`}
-        >
-          ⤢
-        </button>
-      </div>
-    </article>
   );
 }
 
@@ -130,7 +41,6 @@ export default function PokedexModal({
   const loadPage = useCallback(async (targetPage) => {
     setLoading(true);
     setError('');
-    setDexData(null);
 
     try {
       const data = await fetchPokemonDexPage(targetPage);
@@ -191,7 +101,6 @@ export default function PokedexModal({
 
   const totalPages = dexData?.totalPages ?? 1;
   const total = dexData?.total ?? 0;
-  const showPageSkeletons = loading || !dexData;
 
   return (
     <>
@@ -232,19 +141,60 @@ export default function PokedexModal({
           ) : (
             <>
               <div className={`pokedex-grid${loading ? ' is-loading' : ''}`}>
-                {showPageSkeletons
-                  ? Array.from({ length: SKELETON_COUNT }, (_, i) => (
-                      <PokedexCardSkeleton key={`skel-${i}`} />
-                    ))
-                  : dexData?.items.map((item) => (
-                      <PokedexCard
-                        key={item.speciesId}
-                        item={item}
-                        isCurrent={item.speciesId === initialSpeciesId}
-                        onSelect={handleSelect}
-                        onZoom={setZoomTarget}
-                      />
-                    ))}
+                {loading && !dexData ? (
+                  <div className="pokedex-loading">
+                    <div className="spinner" />
+                    <p>도감을 불러오는 중...</p>
+                  </div>
+                ) : (
+                  dexData?.items.map((item) => (
+                    <article
+                      key={item.speciesId}
+                      className={`pokedex-card${item.speciesId === initialSpeciesId ? ' is-current' : ''}`}
+                      onClick={() => handleSelect(item)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleSelect(item);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`${item.koreanName} 색칠도안 만들기`}
+                    >
+                      <div className="pokedex-card-visual">
+                        <img
+                          src={item.artworkUrl}
+                          alt=""
+                          loading="lazy"
+                          onError={(e) => {
+                            e.currentTarget.src = `https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/${item.pokemonId}.png`;
+                          }}
+                        />
+                        <div className="pokedex-card-overlay">
+                          <div className="pokedex-card-top">
+                            <span className="pokedex-card-no">
+                              No. {String(item.speciesId).padStart(4, '0')}
+                            </span>
+                            <TypeBadges types={item.types} />
+                          </div>
+                          <strong>{item.koreanName}</strong>
+                        </div>
+                        <button
+                          type="button"
+                          className="pokedex-card-zoom-fab"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setZoomTarget(item);
+                          }}
+                          aria-label={`${item.koreanName} 원본 이미지 크게 보기`}
+                        >
+                          ⤢
+                        </button>
+                      </div>
+                    </article>
+                  ))
+                )}
               </div>
 
               <div className="pokedex-pagination">
