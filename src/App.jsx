@@ -141,7 +141,8 @@ export default function App() {
               onClick={() => setShowPokedex(true)}
               disabled={loading}
             >
-              도감보기
+              <span className="dex-open-emoji" aria-hidden="true">📖</span>
+              포켓몬 도감 보기
             </button>
           </div>
           <form className="search-row" onSubmit={handleSearch}>
